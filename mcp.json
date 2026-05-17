@@ -1,0 +1,37 @@
+{
+  "$schema": "https://modelcontextprotocol.io/schema/v1/manifest.json",
+  "name": "polyzig-platform",
+  "displayName": "PolyZig — Polymarket Copy-Trading",
+  "description": "Sub-500ms copy-trading on Polymarket prediction markets. Use these tools to discover top traders, manage copy configurations, monitor positions and PnL, and (with `trade:*` scopes) place or cancel orders.",
+  "version": "1.0.0",
+  "protocolVersion": "2025-06-18",
+  "endpoint": {
+    "url": "https://api.polyzig.com/api/mcp",
+    "transport": "streamable-http"
+  },
+  "authentication": {
+    "type": "bearer",
+    "tokenPrefix": "pzk_",
+    "tokenIssuance": "https://polyzig.com/dashboard/keys",
+    "scopes": [
+      "read:account",
+      "read:positions",
+      "read:trades",
+      "read:markets",
+      "trade:execute",
+      "trade:cancel",
+      "wallet:write"
+    ]
+  },
+  "documentation": {
+    "openapi": "https://polyzig.com/openapi.json",
+    "interactive": "https://api.polyzig.com/api/docs",
+    "agents": "https://polyzig.com/AGENTS.md",
+    "humanReadable": "https://polyzig.com/llms-full.txt"
+  },
+  "publisher": {
+    "name": "PolyZig",
+    "url": "https://polyzig.com",
+    "supportEmail": "support@polyzig.com"
+  }
+}
