@@ -232,11 +232,11 @@ The MCP server returns only the tools your credential's scopes permit. **Every t
 
 **Discovery (requires `read:markets`):**
 
-- `search_markets` — active market cards with outcomes, token IDs, prices, links, and iMessage text
-- `get_market_details` — localized context, Gamma status, condition ID, outcome token IDs, prices, volume/liquidity, and bounded live snapshots
-- `get_market_depth` — CLOB best bid/ask, spread, top levels, cumulative liquidity, and depth within 1c/2c/5c
-- `get_market_price_history` — sampled CLOB history with open/latest/high/low/change
-- `list_top_traders` — copyable leaderboard cards for the copy-trading flow
+- `search_markets` — active market cards with emoji/category badges, images/logos, outcome choices, token IDs, prices, links, and iMessage action hints
+- `get_market_details` — localized context, Gamma status, condition ID, outcome token IDs, prices, volume/liquidity, bounded live snapshots, choices, and next-step actions
+- `get_market_depth` — CLOB best bid/ask, spread, top levels, cumulative liquidity, depth within 1c/2c/5c, and depth-card actions
+- `get_market_price_history` — sampled CLOB history with open/latest/high/low/change and chart/depth/trade-preview actions
+- `list_top_traders` — copyable leaderboard cards with avatars, verified badges, and preview-copy actions
 
 **Per-user reads:**
 
@@ -245,6 +245,19 @@ The MCP server returns only the tools your credential's scopes permit. **Every t
 - `list_open_positions` — `read:positions` — current holdings + unrealized PnL
 - `list_paper_positions` — `read:positions` — paper-trading positions
 - `list_trades` — `read:trades` — fill history with latency
+
+### Poke / iMessage presentation
+
+MCP results include raw data plus compact display fields. For Messages, render from these first and keep raw JSON hidden unless the user asks for technical details:
+
+- `title`, `emoji`, `badge`, `subtitle`, `lines`
+- `primary_url` and `image_url` for iMessage link previews
+- `presentation` for surface/style/accent/hero-image hints
+- `choices` for outcome or confirm/edit/cancel options
+- `actions` for next MCP tool hints such as inspect details, show depth, show history, preview an order, create a copy config, or open PolyZig
+- `tap_prompt`, `risk_note`, and `confirmation_text`
+
+Poke public docs do not publish a separate custom attachment schema, so treat these fields as rendering hints and safety metadata, not as authorization. All writes still require OAuth/API-key scopes, exact preview ownership, and `idempotency_key`.
 
 **Copy-trading reads:**
 

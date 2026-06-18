@@ -4,6 +4,8 @@ Public mirror of the OpenAPI 3.1 specification and Model Context Protocol (MCP) 
 
 **Designed for AI agents.** Hosted clients such as Poke connect through PolyZig OAuth so users sign in with Apple/email instead of pasting keys. Developer-owned clients can still mint scoped `pzk_*` API keys from the dashboard. Agents can search localized markets, inspect CLOB depth and price history, discover top traders, manage copy configurations, monitor positions and PnL, and place preview-confirmed Polymarket orders — all with sub-500ms mempool-driven copy execution.
 
+**Built for Messages.** MCP results include compact card fields for Poke/iMessage: `title`, `emoji`, `badge`, `subtitle`, `lines`, `primary_url`, `image_url`, `presentation`, `choices`, `actions`, `tap_prompt`, `risk_note`, and `confirmation_text`. Market cards include category emojis, images/logos when Polymarket provides them, outcome choices, depth/history actions, and preview-trade actions. These are rendering hints and next-tool suggestions; scopes, preview ownership, and idempotency keys remain the safety contract.
+
 ## What's in this repo
 
 | File | What it is |
@@ -87,6 +89,18 @@ The MCP server returns only the tools your credential scopes permit.
 **Direct trading**: `preview_market_order`, `place_market_order`, `list_open_orders`, `cancel_order`, `claim_positions`
 
 See [AGENTS.md](./AGENTS.md) for full descriptions, required scopes, and request shapes.
+
+## Poke / iMessage presentation
+
+For chat surfaces, render the display metadata first and keep raw JSON hidden unless the user asks for technical details.
+
+- Use `emoji` + `title` as the first line, with `badge` where space allows.
+- Use `image_url` and `primary_url` so iMessage can generate rich previews.
+- Use `choices` for outcome selection and confirm/edit/cancel prompts.
+- Use `actions` as hints for the next MCP call: inspect market details, show depth, show price history, preview an order, preview copy settings, or open PolyZig.
+- Use `confirmation_text` exactly before any live write.
+
+Poke's public docs do not currently publish a custom iMessage attachment schema, so this repo documents the reliable v1 contract: polished text, links, images/logos, and structured next-step hints.
 
 ## Why an MCP server for Polymarket?
 
