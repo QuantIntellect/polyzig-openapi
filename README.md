@@ -1,8 +1,8 @@
 # PolyZig API & MCP Server
 
-Public mirror of the OpenAPI 3.1 specification and Model Context Protocol (MCP) server manifest for [polyzig.com](https://polyzig.com) — the worldwide Polymarket copy-trading platform.
+Public mirror of the OpenAPI 3.1 specification and Model Context Protocol (MCP) server manifest for [polyzig.com](https://polyzig.com) — the worldwide Polymarket market-intelligence and copy-trading platform.
 
-**Designed for AI agents.** Mint a scoped API key from the dashboard, point Claude Desktop or Cursor at the MCP endpoint, and your agent can discover top traders, manage copy configurations, monitor positions and PnL, and (with the right scopes) place orders on Polymarket — all with sub-500ms mempool-driven execution.
+**Designed for AI agents.** Hosted clients such as Poke connect through PolyZig OAuth so users sign in with Apple/email instead of pasting keys. Developer-owned clients can still mint scoped `pzk_*` API keys from the dashboard. Agents can search localized markets, inspect CLOB depth and price history, discover top traders, manage copy configurations, monitor positions and PnL, and place preview-confirmed Polymarket orders — all with sub-500ms mempool-driven copy execution.
 
 ## What's in this repo
 
@@ -21,15 +21,16 @@ Public mirror of the OpenAPI 3.1 specification and Model Context Protocol (MCP) 
 - **MCP server**: `https://api.polyzig.com/api/mcp` (JSON-RPC 2.0 over Streamable HTTP)
 - **MCP manifest**: `https://polyzig.com/.well-known/mcp.json`
 - **Developer landing**: `https://polyzig.com/developers`
+- **OAuth metadata**: `https://api.polyzig.com/.well-known/oauth-authorization-server`
 - **Mint API keys**: `https://polyzig.com/dashboard/keys`
 
 ## Quick start
 
-### 1. Mint an API key
+### 1. Choose auth
 
-Sign in at [polyzig.com](https://polyzig.com), open `/dashboard/keys`, and create a key with the scopes your agent needs. The secret is shown **once** — copy it immediately.
+Hosted MCP clients should use PolyZig OAuth. The user signs in to PolyZig with Apple, email, or another enabled identity and approves scopes. Do not ask Poke users to paste a PolyZig API key.
 
-Keys are prefixed `pzk_live_…`.
+Developer-owned clients that do not support OAuth can sign in at [polyzig.com](https://polyzig.com), open `/dashboard/keys`, and create a scoped API key. The secret is shown **once**. Keys are prefixed `pzk_`.
 
 ### 2. Verify with curl
 
@@ -66,16 +67,16 @@ Keys carry explicit scopes. Default to the minimum your agent actually needs.
 | `read:account` | Profile, balance, PnL summary |
 | `read:positions` | Open + paper positions |
 | `read:trades` | Trade history and fills |
-| `read:markets` | Market search, open orders, leaderboard |
+| `read:markets` | Market search, localized details, CLOB depth, price history, open orders, leaderboard |
 | `trade:execute` | Place orders; create/start/stop copy configs |
 | `trade:cancel` | Cancel resting CLOB orders |
 | `wallet:write` | Claim resolved positions, withdraw, wrap-to-pUSD |
 
 ## MCP tool catalogue (v1)
 
-The MCP server returns only the tools your key's scopes permit.
+The MCP server returns only the tools your credential scopes permit.
 
-**Discovery / unauthenticated-scope**: `get_platform_stats`, `search_markets`
+**Discovery / setup**: `get_platform_stats`, `get_trading_readiness`, `search_markets`, `get_market_details`, `get_market_depth`, `get_market_price_history`, `list_top_traders`
 
 **Per-user reads**: `get_user_summary`, `list_open_positions`, `list_paper_positions`, `list_trades`
 
@@ -83,7 +84,7 @@ The MCP server returns only the tools your key's scopes permit.
 
 **Copy-trading writes**: `create_copy_config`, `start_copying`, `stop_copying`, `delete_copy_config`
 
-**Direct trading**: `place_market_order`, `list_open_orders`, `cancel_order`, `claim_positions`
+**Direct trading**: `preview_market_order`, `place_market_order`, `list_open_orders`, `cancel_order`, `claim_positions`
 
 See [AGENTS.md](./AGENTS.md) for full descriptions, required scopes, and request shapes.
 
@@ -93,7 +94,8 @@ PolyZig's marquee feature is **sub-500ms copy-trading**: when a target Polymarke
 
 Wiring that to an MCP server means agents can:
 
-- Discover a target trader via `search_markets` + the public leaderboard feed
+- Search Polymarket markets in supported locales, then call `get_market_details`, `get_market_depth`, and `get_market_price_history` before previewing a trade
+- Discover a target trader via `list_top_traders` or the public leaderboard feed
 - Use `suggest_multiplier` to size a config to the user's actual balance
 - `create_copy_config` with `paper_trading: true` and let it run for a session
 - Inspect `get_config_pnl` and `get_config_trades` to evaluate performance
@@ -103,7 +105,7 @@ The whole copy-trading lifecycle is exposed as first-party MCP tools, scope-gate
 
 ## Reliability primitives
 
-Every write endpoint supports an `Idempotency-Key` header (24h TTL). A retried claim or withdraw on a network blip never double-fires.
+Every REST write endpoint supports an `Idempotency-Key` header (24h TTL). Every MCP write tool requires an `idempotency_key` argument. A retried claim, config change, or order on a network blip never double-fires.
 
 Every error response shares this shape:
 
