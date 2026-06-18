@@ -1,8 +1,8 @@
 {
   "$schema": "https://modelcontextprotocol.io/schema/v1/manifest.json",
   "name": "polyzig-platform",
-  "displayName": "PolyZig — Polymarket Copy-Trading",
-  "description": "Sub-500ms copy-trading on Polymarket prediction markets. Use these tools to discover top traders, manage copy configurations, monitor positions and PnL, and (with `trade:*` scopes) place or cancel orders.",
+  "displayName": "PolyZig — Polymarket Trader",
+  "description": "Polymarket market intelligence and sub-500ms copy-trading. Poke users connect with PolyZig OAuth, inspect localized markets, depth, history, and liquidity, then trade or manage copy configurations from Messages with preview-confirmed live writes.",
   "version": "1.0.0",
   "protocolVersion": "2025-06-18",
   "endpoint": {
@@ -10,9 +10,14 @@
     "transport": "streamable-http"
   },
   "authentication": {
-    "type": "bearer",
-    "tokenPrefix": "pzk_",
-    "tokenIssuance": "https://polyzig.com/dashboard/keys",
+    "type": "oauth2",
+    "tokenPrefix": "pzo_",
+    "authorizationServer": "https://api.polyzig.com/.well-known/oauth-authorization-server",
+    "protectedResource": "https://api.polyzig.com/.well-known/oauth-protected-resource",
+    "authorizationEndpoint": "https://api.polyzig.com/api/oauth/authorize",
+    "tokenEndpoint": "https://api.polyzig.com/api/oauth/token",
+    "registrationEndpoint": "https://api.polyzig.com/api/oauth/register",
+    "credentialMode": "user-login",
     "scopes": [
       "read:account",
       "read:positions",
@@ -20,6 +25,17 @@
       "read:markets",
       "trade:execute",
       "trade:cancel",
+      "wallet:write"
+    ],
+    "recommendedScopes": [
+      "read:account",
+      "read:positions",
+      "read:trades",
+      "read:markets",
+      "trade:execute",
+      "trade:cancel"
+    ],
+    "optionalScopes": [
       "wallet:write"
     ]
   },

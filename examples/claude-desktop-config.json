@@ -1,5 +1,5 @@
 {
-  "_comment": "Drop this into ~/Library/Application Support/Claude/claude_desktop_config.json (macOS) or %APPDATA%/Claude/claude_desktop_config.json (Windows). Restart Claude Desktop. Your agent gets every MCP tool whose scope your key holds. The `type: http` field is required by Anthropic's MCP JSON schema — without it some clients reject the entry.",
+  "_comment": "Developer-owned clients can use a scoped pzk_* API key. Hosted clients such as Poke should use PolyZig OAuth instead of asking users to paste keys. Drop this into ~/Library/Application Support/Claude/claude_desktop_config.json (macOS) or %APPDATA%/Claude/claude_desktop_config.json (Windows), then restart Claude Desktop. Your agent gets every MCP tool whose scope your key holds. The `type: http` field is required by Anthropic's MCP JSON schema.",
   "mcpServers": {
     "polyzig": {
       "type": "http",

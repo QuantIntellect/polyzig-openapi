@@ -6,7 +6,7 @@ A self-contained, human + machine-readable reference for AI agents and developer
 - **Interactive docs**: <https://api.polyzig.com/api/docs>
 - **MCP manifest**: <https://polyzig.com/.well-known/mcp.json>
 - **MCP endpoint**: <https://api.polyzig.com/api/mcp>
-- **Mint API keys**: <https://polyzig.com/dashboard/keys>
+- **OAuth metadata**: <https://api.polyzig.com/.well-known/oauth-authorization-server>
 
 ## What PolyZig is
 
@@ -14,24 +14,26 @@ PolyZig is the worldwide Polymarket trading platform, with a sub-500ms mempool-d
 
 ## Authentication
 
-Two bearer-token mechanisms, both passed as `Authorization: Bearer <token>`:
+Three bearer-token mechanisms are accepted, all passed as `Authorization: Bearer <token>`:
 
 1. **Session JWT** — issued via the browser flow (`POST /api/auth/magic` or `POST /api/auth/verify-code`). Full account scope, 24h expiry. Intended for the first-party web app. **Not recommended for agents** — JWT leakage exposes the whole account.
 
-2. **API key** (`pzk_*`) — minted from the dashboard at <https://polyzig.com/dashboard/keys>. Carries explicit scopes, revocable independently of the user's password, default 90-day expiry. **This is the right credential for agents.**
+2. **OAuth MCP access token** (`pzo_*`) — issued by PolyZig OAuth after the user signs in with Apple, email, or another enabled PolyZig identity. This is the right credential for hosted integrations such as Poke because users approve access with normal login instead of copying API keys.
 
-> Agents minting their own keys is not supported — only a browser-authenticated user can create or revoke keys. This is intentional: it keeps the loop "user → agent" instead of "agent → agent".
+3. **API key** (`pzk_*`) — minted from the dashboard at <https://polyzig.com/dashboard/keys>. Carries explicit scopes, revocable independently of the user's password, default 90-day expiry. Use this for developer-owned clients that do not support OAuth.
+
+> Poke and other hosted MCP clients should use OAuth. Do not ask end users to paste a PolyZig API key into Poke.
 
 ## Scopes
 
-Mint a key with only the scopes the agent actually needs. Default to read-only.
+Grant only the scopes the agent actually needs. Default to read-only.
 
 | Scope | What it allows | Recommended for |
 |---|---|---|
 | `read:account` | User profile, balance, PnL summary | Every key |
 | `read:positions` | List open + paper positions | Monitoring agents |
 | `read:trades` | Trade history, fills | Analytics agents |
-| `read:markets` | Market search, open orders, leaderboard | Discovery agents |
+| `read:markets` | Market search, market details, depth, history, open orders, leaderboard | Discovery agents |
 | `trade:execute` | Place market/limit orders. Create + start + stop copy configs. | Copy-trading agents |
 | `trade:cancel` | Cancel resting CLOB orders | Market-making agents |
 | `wallet:write` | Claim resolved positions, withdraw, wrap-to-pUSD | Settlement agents |
@@ -126,7 +128,7 @@ Body:
 
 ## Idempotency
 
-Every state-changing endpoint accepts an `Idempotency-Key` request header. Re-submitting the same key within 24 hours returns the cached response instead of re-executing. Generate a fresh UUID per logical operation; retry with the same key on transport failure.
+Most state-changing endpoints accept an `Idempotency-Key` request header. Re-submitting the same key within 24 hours returns the cached response instead of re-executing. Generate a fresh UUID per logical operation; retry with the same key on transport failure.
 
 ```http
 POST /api/positions/claim
@@ -134,6 +136,13 @@ Idempotency-Key: 5b6f2c4a-...        # safe to retry until 200 lands
 ```
 
 Replayed responses include `Idempotent-Replay: true`.
+
+**Exceptions — these routes are *not* cached even if you send the header:**
+
+- `POST /api/keys` — the response body contains the one-time `pzk_*` secret. Caching it would defeat the "shown once, never stored" contract. Each retry mints a **new** key, so don't retry blindly; surface the failure to the user and let them re-issue from the dashboard.
+- `POST /api/mcp` — JSON-RPC errors travel inside an HTTP 200 envelope. Caching them by status would memoize transient tool failures for 24h. MCP retries should rely on the JSON-RPC `id` field instead.
+
+**In-flight collision**: if two requests with the same key arrive concurrently, exactly one runs the handler; the others get `409 Conflict` + `Retry-After` until the first completes. Retry with the same key after the hinted delay to either replay the cached response or get a clean run if the first attempt failed.
 
 ## Rate limits
 
@@ -187,7 +196,7 @@ Every error response shares this shape:
 | `feature_not_enabled` | 501 | API surface exists but not active in this deployment |
 | `polymarket_unavailable` | 503 | Upstream Polymarket flow failed (retry with backoff) |
 | `rate_limited` | 429 | Slow down; consult `Retry-After` |
-| `scope_required` | 401 | API key missing the required scope |
+| `scope_required` | 403 | Scoped credential missing the required scope |
 
 ## Money
 
@@ -204,25 +213,34 @@ Floating-point fields like `current_value`, `unrealized_pnl`, `claimable_value`,
 
 ## Model Context Protocol (MCP)
 
-Connect any MCP-compatible client (Claude Desktop, Cursor, Anthropic SDK, ChatGPT) to PolyZig:
+Connect any MCP-compatible client to PolyZig:
 
 ```
 Endpoint:  https://api.polyzig.com/api/mcp
 Transport: Streamable HTTP (single POST per JSON-RPC request)
-Auth:      Authorization: Bearer pzk_*
+Auth:      Poke/hosted clients: OAuth pzo_* access token
+           Developer clients: Authorization: Bearer pzk_*
 ```
 
-The MCP server returns only the tools your key's scopes permit. Read tools have no scope requirement (free for any authenticated key); write tools require the matching `trade:*` / `wallet:*` scope at both `tools/list` and `tools/call` time.
+The MCP server returns only the tools your credential's scopes permit. **Every tool except `get_platform_stats` requires a matching scope** — `tools/list` filters by scope server-side, so a credential with only `read:account` will not see `search_markets` (which needs `read:markets`) in its tool catalog. Grant the union of scopes for every tool you intend to call.
 
 ### Tool catalogue (v1)
 
-**Discovery / read-only — no scope:**
+**Public / no scope required:**
 
-- `get_platform_stats` — median/p95 latency, fill volume, detection breakdown
-- `search_markets` — full-text match on Polymarket market titles
+- `get_platform_stats` — median/p95 latency, fill volume, detection breakdown. Callable by any authenticated key.
+
+**Discovery (requires `read:markets`):**
+
+- `search_markets` — active market cards with outcomes, token IDs, prices, links, and iMessage text
+- `get_market_details` — localized context, Gamma status, condition ID, outcome token IDs, prices, volume/liquidity, and bounded live snapshots
+- `get_market_depth` — CLOB best bid/ask, spread, top levels, cumulative liquidity, and depth within 1c/2c/5c
+- `get_market_price_history` — sampled CLOB history with open/latest/high/low/change
+- `list_top_traders` — copyable leaderboard cards for the copy-trading flow
 
 **Per-user reads:**
 
+- `get_trading_readiness` — `read:account` — scopes, balance, trading wallet status, setup blockers
 - `get_user_summary` — `read:account` — trade count, fees paid
 - `list_open_positions` — `read:positions` — current holdings + unrealized PnL
 - `list_paper_positions` — `read:positions` — paper-trading positions
@@ -235,28 +253,30 @@ The MCP server returns only the tools your key's scopes permit. Read tools have 
 - `get_config_pnl` — `read:account` — config-level PnL breakdown
 - `get_config_trades` — `read:trades` — trades attributed to one config
 - `suggest_multiplier` — `read:markets` — recommended sizing for current balance
+- `preview_copy_config` — `trade:execute` — summarize target, sizing, caps, TP/SL, live/paper mode
 
 **Copy-trading writes:**
 
-- `create_copy_config` — `trade:execute` — create a copy config (inactive)
-- `start_copying` — `trade:execute` — activate mirroring
-- `stop_copying` — `trade:execute` — deactivate (positions stay open)
-- `delete_copy_config` — `trade:execute` — permanent delete
+- `create_copy_config` — `trade:execute` — create an inactive config from `preview_copy_config.preview_id`
+- `start_copying` — `trade:execute` — activate mirroring; requires `idempotency_key`
+- `stop_copying` — `trade:execute` — deactivate (positions stay open); requires `idempotency_key`
+- `delete_copy_config` — `trade:execute` — permanent delete; requires `idempotency_key`
 
 **Direct trading:**
 
-- `place_market_order` — `trade:execute`
+- `preview_market_order` — `trade:execute` — exact order preview with token, price, estimated shares, slippage, and confirmation text
+- `place_market_order` — `trade:execute` — live order from `preview_market_order.preview_id`; requires `idempotency_key`
 - `list_open_orders` — `read:markets`
-- `cancel_order` — `trade:cancel`
-- `claim_positions` — `wallet:write`
+- `cancel_order` — `trade:cancel`; requires `idempotency_key`
+- `claim_positions` — `wallet:write`; requires `idempotency_key`
 
 ## Operational best practices for agents
 
 1. **Always paper-trade a new target.** Set `paper_trading: true` on the first copy config for any new wallet. Run it for at least a session, look at PnL, then promote.
-2. **Set `Idempotency-Key` on every write.** Network blips are the normal failure mode at 500ms latency.
+2. **Set `idempotency_key` on every MCP write.** Network blips are the normal failure mode at 500ms latency.
 3. **Watch `tier_limit_exceeded`.** Some features require HFT Elite tier. Surface the upgrade link to the user, don't retry.
 4. **Respect `Retry-After`.** 429s rarely happen but when they do, back off — don't burst-retry.
-5. **Mint scoped keys.** Don't give a monitoring agent `trade:execute`. Don't give a copy-trading agent `wallet:write`.
+5. **Grant scoped access.** Don't give a monitoring agent `trade:execute`. Don't give a copy-trading agent `wallet:write` unless it will claim positions.
 
 ## Feedback / support
 

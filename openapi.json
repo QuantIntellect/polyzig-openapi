@@ -3,7 +3,7 @@
   "info": {
     "title": "PolyZig Platform API",
     "version": "1.1.0",
-    "description": "Public HTTP API for the PolyZig copy-trading platform. Designed to be safely consumed by AI agents, automation scripts, and third-party integrations. See `https://polyzig.com/llms-full.txt` for an agent-oriented integration guide.\n\n## Authentication\n\nTwo bearer credentials are accepted on `Authorization: Bearer <token>`:\n\n1. **JWT** (first-party clients) — issued by `/api/auth/magic` or `/api/auth/verify-code`. 24h expiry, full account scope.\n2. **API key** (`pzk_*`, recommended for agents) — minted from the user dashboard with explicit scopes and independent revocation.\n\n## Idempotency\n\nState-changing endpoints accept an `Idempotency-Key` request header. Re-submitting the same key within 24h returns the cached response instead of re-executing. Generate a fresh UUID per logical operation and retry with the same key on transport failure.\n\n## Rate limits\n\nDefault: 60 req/s/IP, 500 burst. Responses include `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`. 429 / 503 responses include `Retry-After` (seconds).\n\n## Errors\n\nAll error responses share the shape `{ \"error\": \"...\", \"code\": \"machine_readable_code\" }`. Branch on `code`, not on `error` (which may be localized).",
+    "description": "Public HTTP API for the PolyZig copy-trading platform. Designed to be safely consumed by AI agents, automation scripts, and third-party integrations. See `https://polyzig.com/llms-full.txt` for an agent-oriented integration guide.\n\n## Authentication\n\nThree bearer credentials are accepted on `Authorization: Bearer <token>`:\n\n1. **JWT** (first-party clients) — issued by `/api/auth/magic` or `/api/auth/verify-code`. 24h expiry, full account scope.\n2. **OAuth MCP access token** (`pzo_*`) — issued by PolyZig OAuth after the user signs in with Apple/email/another enabled identity. Hosted MCP clients such as Poke should use this flow instead of asking users to paste API keys.\n3. **API key** (`pzk_*`) — minted from the user dashboard with explicit scopes and independent revocation. Intended for developer-owned clients that do not support OAuth.\n\n## Idempotency\n\nState-changing REST endpoints accept an `Idempotency-Key` request header. MCP write tools require an `idempotency_key` argument. Re-submitting the same key within 24h returns the cached response instead of re-executing. Generate a fresh UUID per logical operation and retry with the same key on transport failure.\n\n## Rate limits\n\nDefault: 60 req/s/IP, 500 burst. Responses include `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`. 429 / 503 responses include `Retry-After` (seconds).\n\n## Errors\n\nAll error responses share the shape `{ \"error\": \"...\", \"code\": \"machine_readable_code\" }`. Branch on `code`, not on `error` (which may be localized).",
     "contact": {
       "name": "PolyZig support",
       "email": "support@polyzig.com",
@@ -15,27 +15,79 @@
     }
   },
   "servers": [
-    { "url": "https://api.polyzig.com", "description": "Production" }
+    {
+      "url": "https://api.polyzig.com",
+      "description": "Production"
+    }
   ],
   "tags": [
-    { "name": "auth", "description": "Login, signup, identity providers" },
-    { "name": "users", "description": "Current user profile" },
-    { "name": "wallets", "description": "Polygon wallet + trading credentials" },
-    { "name": "keys", "description": "API key management for agent access" },
-    { "name": "stats", "description": "Platform + per-user transparency metrics" },
-    { "name": "markets", "description": "Polymarket market data + order entry" },
-    { "name": "positions", "description": "Open positions, claims, sells" },
-    { "name": "paper", "description": "Paper-trading positions + history" },
-    { "name": "trades", "description": "Executed trade history" },
-    { "name": "configs", "description": "Copy-trading config CRUD + lifecycle" },
-    { "name": "subscription", "description": "Tier, billing, treasury balance" },
-    { "name": "notifications", "description": "User notifications" },
-    { "name": "arbitrage", "description": "AI arbitrage scanner (HFT tier)" },
-    { "name": "mcp", "description": "Model Context Protocol server endpoint" }
+    {
+      "name": "auth",
+      "description": "Login, signup, identity providers"
+    },
+    {
+      "name": "users",
+      "description": "Current user profile"
+    },
+    {
+      "name": "wallets",
+      "description": "Polygon wallet + trading credentials"
+    },
+    {
+      "name": "keys",
+      "description": "API key management for agent access"
+    },
+    {
+      "name": "stats",
+      "description": "Platform + per-user transparency metrics"
+    },
+    {
+      "name": "markets",
+      "description": "Polymarket market data + order entry"
+    },
+    {
+      "name": "positions",
+      "description": "Open positions, claims, sells"
+    },
+    {
+      "name": "paper",
+      "description": "Paper-trading positions + history"
+    },
+    {
+      "name": "trades",
+      "description": "Executed trade history"
+    },
+    {
+      "name": "configs",
+      "description": "Copy-trading config CRUD + lifecycle"
+    },
+    {
+      "name": "subscription",
+      "description": "Tier, billing, treasury balance"
+    },
+    {
+      "name": "notifications",
+      "description": "User notifications"
+    },
+    {
+      "name": "arbitrage",
+      "description": "AI arbitrage scanner (HFT tier)"
+    },
+    {
+      "name": "mcp",
+      "description": "Model Context Protocol server endpoint"
+    }
   ],
   "security": [
-    { "bearerJwt": [] },
-    { "apiKey": [] }
+    {
+      "bearerJwt": []
+    },
+    {
+      "oauthMcp": []
+    },
+    {
+      "apiKey": []
+    }
   ],
   "components": {
     "securitySchemes": {
@@ -44,6 +96,12 @@
         "scheme": "bearer",
         "bearerFormat": "JWT",
         "description": "Session JWT from `/api/auth/magic` or `/api/auth/verify-code`. Full account scope, 24h expiry."
+      },
+      "oauthMcp": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "pzo_*",
+        "description": "Short-lived OAuth MCP access token issued by PolyZig OAuth after the user signs in with Apple/email/another enabled PolyZig identity. Intended for hosted MCP clients such as Poke."
       },
       "apiKey": {
         "type": "http",
@@ -56,27 +114,42 @@
       "idempotencyKey": {
         "name": "Idempotency-Key",
         "in": "header",
-        "schema": { "type": "string", "format": "uuid" },
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        },
         "required": false,
         "description": "Unique key for safe retries on state-changing requests. Cached for 24 hours."
       },
       "limit": {
         "name": "limit",
         "in": "query",
-        "schema": { "type": "integer", "minimum": 1, "maximum": 1000, "default": 50 },
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "default": 50
+        },
         "required": false
       },
       "offset": {
         "name": "offset",
         "in": "query",
-        "schema": { "type": "integer", "minimum": 0, "default": 0 },
+        "schema": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0
+        },
         "required": false
       }
     },
     "schemas": {
       "Error": {
         "type": "object",
-        "required": ["error", "code"],
+        "required": [
+          "error",
+          "code"
+        ],
         "properties": {
           "error": {
             "type": "string",
@@ -110,11 +183,24 @@
       },
       "Pagination": {
         "type": "object",
-        "required": ["limit", "offset", "has_next"],
+        "required": [
+          "limit",
+          "offset",
+          "has_next"
+        ],
         "properties": {
-          "limit": { "type": "integer", "example": 50 },
-          "offset": { "type": "integer", "example": 0 },
-          "has_next": { "type": "boolean", "example": false }
+          "limit": {
+            "type": "integer",
+            "example": 50
+          },
+          "offset": {
+            "type": "integer",
+            "example": 0
+          },
+          "has_next": {
+            "type": "boolean",
+            "example": false
+          }
         }
       },
       "DecimalString": {
@@ -126,137 +212,355 @@
       "PlatformStats": {
         "type": "object",
         "properties": {
-          "median_latency_ms": { "type": "number", "example": 412 },
-          "p95_latency_ms": { "type": "number", "example": 680 },
-          "total_users": { "type": "integer" },
-          "total_trades_24h": { "type": "integer" },
-          "total_volume_usdc_24h": { "$ref": "#/components/schemas/DecimalString" }
+          "median_latency_ms": {
+            "type": "number",
+            "example": 412
+          },
+          "p95_latency_ms": {
+            "type": "number",
+            "example": 680
+          },
+          "total_users": {
+            "type": "integer"
+          },
+          "total_trades_24h": {
+            "type": "integer"
+          },
+          "total_volume_usdc_24h": {
+            "$ref": "#/components/schemas/DecimalString"
+          }
         }
       },
       "UserSummary": {
         "type": "object",
         "properties": {
-          "user_id": { "type": "string", "format": "uuid" },
-          "total_pnl": { "$ref": "#/components/schemas/DecimalString" },
-          "realized_pnl": { "$ref": "#/components/schemas/DecimalString" },
-          "trade_count": { "type": "integer" },
-          "fees_paid": { "$ref": "#/components/schemas/DecimalString" }
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "total_pnl": {
+            "$ref": "#/components/schemas/DecimalString"
+          },
+          "realized_pnl": {
+            "$ref": "#/components/schemas/DecimalString"
+          },
+          "trade_count": {
+            "type": "integer"
+          },
+          "fees_paid": {
+            "$ref": "#/components/schemas/DecimalString"
+          }
         }
       },
       "Position": {
         "type": "object",
         "properties": {
-          "token_id": { "type": "string" },
-          "market_slug": { "type": "string" },
-          "market_title": { "type": "string" },
-          "outcome": { "type": "string", "example": "Yes" },
-          "size": { "$ref": "#/components/schemas/DecimalString" },
-          "cost_basis": { "$ref": "#/components/schemas/DecimalString" },
-          "current_price": { "$ref": "#/components/schemas/DecimalString" },
-          "current_value": { "$ref": "#/components/schemas/DecimalString" },
-          "unrealized_pnl": { "$ref": "#/components/schemas/DecimalString" },
-          "resolved": { "type": "boolean" },
-          "claimable_value": { "$ref": "#/components/schemas/DecimalString", "nullable": true }
+          "token_id": {
+            "type": "string"
+          },
+          "market_slug": {
+            "type": "string"
+          },
+          "market_title": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string",
+            "example": "Yes"
+          },
+          "size": {
+            "$ref": "#/components/schemas/DecimalString"
+          },
+          "cost_basis": {
+            "$ref": "#/components/schemas/DecimalString"
+          },
+          "current_price": {
+            "$ref": "#/components/schemas/DecimalString"
+          },
+          "current_value": {
+            "$ref": "#/components/schemas/DecimalString"
+          },
+          "unrealized_pnl": {
+            "$ref": "#/components/schemas/DecimalString"
+          },
+          "resolved": {
+            "type": "boolean"
+          },
+          "claimable_value": {
+            "$ref": "#/components/schemas/DecimalString",
+            "nullable": true
+          }
         }
       },
       "PositionList": {
         "type": "object",
-        "required": ["positions", "pagination"],
+        "required": [
+          "positions",
+          "pagination"
+        ],
         "properties": {
-          "positions": { "type": "array", "items": { "$ref": "#/components/schemas/Position" } },
-          "pagination": { "$ref": "#/components/schemas/Pagination" }
+          "positions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Position"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
         }
       },
       "Trade": {
         "type": "object",
         "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "token_id": { "type": "string" },
-          "market_slug": { "type": "string" },
-          "side": { "type": "string", "enum": ["buy", "sell"] },
-          "size": { "$ref": "#/components/schemas/DecimalString" },
-          "price": { "$ref": "#/components/schemas/DecimalString" },
-          "filled_price": { "$ref": "#/components/schemas/DecimalString" },
-          "usdc_value": { "$ref": "#/components/schemas/DecimalString" },
-          "fee": { "$ref": "#/components/schemas/DecimalString" },
-          "latency_ms": { "type": "integer", "nullable": true },
-          "status": { "type": "string", "enum": ["pending", "filled", "cancelled", "failed"] },
-          "created_at": { "type": "string", "format": "date-time" },
-          "filled_at": { "type": "string", "format": "date-time", "nullable": true }
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "token_id": {
+            "type": "string"
+          },
+          "market_slug": {
+            "type": "string"
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "buy",
+              "sell"
+            ]
+          },
+          "size": {
+            "$ref": "#/components/schemas/DecimalString"
+          },
+          "price": {
+            "$ref": "#/components/schemas/DecimalString"
+          },
+          "filled_price": {
+            "$ref": "#/components/schemas/DecimalString"
+          },
+          "usdc_value": {
+            "$ref": "#/components/schemas/DecimalString"
+          },
+          "fee": {
+            "$ref": "#/components/schemas/DecimalString"
+          },
+          "latency_ms": {
+            "type": "integer",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "filled",
+              "cancelled",
+              "failed"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "filled_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
         }
       },
       "TradeList": {
         "type": "object",
-        "required": ["trades", "pagination"],
+        "required": [
+          "trades",
+          "pagination"
+        ],
         "properties": {
-          "trades": { "type": "array", "items": { "$ref": "#/components/schemas/Trade" } },
-          "pagination": { "$ref": "#/components/schemas/Pagination" }
+          "trades": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Trade"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
         }
       },
       "Order": {
         "type": "object",
         "properties": {
-          "order_id": { "type": "string" },
-          "token_id": { "type": "string" },
-          "side": { "type": "string", "enum": ["buy", "sell"] },
-          "price": { "$ref": "#/components/schemas/DecimalString" },
-          "size": { "$ref": "#/components/schemas/DecimalString" },
-          "filled_size": { "$ref": "#/components/schemas/DecimalString" },
-          "status": { "type": "string" },
-          "order_type": { "type": "string", "enum": ["market", "limit"] },
-          "created_at": { "type": "string", "format": "date-time" }
+          "order_id": {
+            "type": "string"
+          },
+          "token_id": {
+            "type": "string"
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "buy",
+              "sell"
+            ]
+          },
+          "price": {
+            "$ref": "#/components/schemas/DecimalString"
+          },
+          "size": {
+            "$ref": "#/components/schemas/DecimalString"
+          },
+          "filled_size": {
+            "$ref": "#/components/schemas/DecimalString"
+          },
+          "status": {
+            "type": "string"
+          },
+          "order_type": {
+            "type": "string",
+            "enum": [
+              "market",
+              "limit"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
         }
       },
       "PlaceOrderRequest": {
         "type": "object",
-        "required": ["token_id", "side", "size", "order_type"],
+        "required": [
+          "token_id",
+          "side",
+          "size",
+          "order_type"
+        ],
         "properties": {
-          "token_id": { "type": "string" },
-          "side": { "type": "string", "enum": ["buy", "sell"] },
-          "size": { "$ref": "#/components/schemas/DecimalString" },
-          "price": { "$ref": "#/components/schemas/DecimalString", "description": "Required for limit orders." },
-          "order_type": { "type": "string", "enum": ["market", "limit"] }
+          "token_id": {
+            "type": "string"
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "buy",
+              "sell"
+            ]
+          },
+          "size": {
+            "$ref": "#/components/schemas/DecimalString"
+          },
+          "price": {
+            "$ref": "#/components/schemas/DecimalString",
+            "description": "Required for limit orders."
+          },
+          "order_type": {
+            "type": "string",
+            "enum": [
+              "market",
+              "limit"
+            ]
+          }
         }
       },
       "PlaceOrderResponse": {
         "type": "object",
         "properties": {
-          "order_id": { "type": "string" },
-          "status": { "type": "string", "enum": ["accepted", "filled", "rejected"] },
-          "filled_size": { "$ref": "#/components/schemas/DecimalString" },
-          "average_price": { "$ref": "#/components/schemas/DecimalString" }
+          "order_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "accepted",
+              "filled",
+              "rejected"
+            ]
+          },
+          "filled_size": {
+            "$ref": "#/components/schemas/DecimalString"
+          },
+          "average_price": {
+            "$ref": "#/components/schemas/DecimalString"
+          }
         }
       },
       "CopyConfig": {
         "type": "object",
         "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "target_address": { "type": "string", "pattern": "^0x[0-9a-fA-F]{40}$" },
-          "size_multiplier": { "$ref": "#/components/schemas/DecimalString" },
-          "max_position_usdc": { "$ref": "#/components/schemas/DecimalString" },
-          "price_deviation_bps": { "type": "integer" },
-          "blocked_categories": { "type": "array", "items": { "type": "string" } },
-          "take_profit_bps": { "type": "integer", "nullable": true },
-          "stop_loss_bps": { "type": "integer", "nullable": true },
-          "is_active": { "type": "boolean" },
-          "created_at": { "type": "string", "format": "date-time" }
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target_address": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{40}$"
+          },
+          "size_multiplier": {
+            "$ref": "#/components/schemas/DecimalString"
+          },
+          "max_position_usdc": {
+            "$ref": "#/components/schemas/DecimalString"
+          },
+          "price_deviation_bps": {
+            "type": "integer"
+          },
+          "blocked_categories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "take_profit_bps": {
+            "type": "integer",
+            "nullable": true
+          },
+          "stop_loss_bps": {
+            "type": "integer",
+            "nullable": true
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
         }
       },
       "MarketTranslation": {
         "type": "object",
         "properties": {
-          "slug": { "type": "string" },
-          "locale": { "type": "string", "example": "fr" },
-          "title": { "type": "string" },
-          "description": { "type": "string" }
+          "slug": {
+            "type": "string"
+          },
+          "locale": {
+            "type": "string",
+            "example": "fr"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
         }
       },
       "ApiKey": {
         "type": "object",
         "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "name": { "type": "string", "example": "claude-agent" },
-          "prefix": { "type": "string", "example": "pzk_a1b2c3..." },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "example": "claude-agent"
+          },
+          "prefix": {
+            "type": "string",
+            "example": "pzk_a1b2c3..."
+          },
           "scopes": {
             "type": "array",
             "items": {
@@ -272,31 +576,65 @@
               ]
             }
           },
-          "created_at": { "type": "string", "format": "date-time" },
-          "last_used_at": { "type": "string", "format": "date-time", "nullable": true },
-          "expires_at": { "type": "string", "format": "date-time", "nullable": true },
-          "revoked_at": { "type": "string", "format": "date-time", "nullable": true }
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_used_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "revoked_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
         }
       },
       "ApiKeyCreateRequest": {
         "type": "object",
-        "required": ["name", "scopes"],
+        "required": [
+          "name",
+          "scopes"
+        ],
         "properties": {
-          "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
           "scopes": {
             "type": "array",
-            "items": { "type": "string" },
+            "items": {
+              "type": "string"
+            },
             "minItems": 1
           },
-          "expires_in_days": { "type": "integer", "minimum": 1, "maximum": 365, "nullable": true }
+          "expires_in_days": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 365,
+            "nullable": true,
+            "description": "Lifetime of the new key in days. `0` means the key never expires (still revocable from the dashboard). Omit to use the server default (90 days). Range matches the dashboard `Never` option and the backend's accepted values."
+          }
         }
       },
       "ApiKeyCreateResponse": {
         "allOf": [
-          { "$ref": "#/components/schemas/ApiKey" },
+          {
+            "$ref": "#/components/schemas/ApiKey"
+          },
           {
             "type": "object",
-            "required": ["secret"],
+            "required": [
+              "secret"
+            ],
             "properties": {
               "secret": {
                 "type": "string",
@@ -311,70 +649,151 @@
     "responses": {
       "Unauthorized": {
         "description": "Missing or invalid credentials.",
-        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
       },
       "Forbidden": {
         "description": "Authenticated but missing scope or tier.",
-        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
       },
       "RateLimited": {
         "description": "Rate limit exceeded.",
         "headers": {
-          "Retry-After": { "schema": { "type": "integer" }, "description": "Seconds until retry is permitted." }
+          "Retry-After": {
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Seconds until retry is permitted."
+          }
         },
-        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
       }
     }
   },
   "paths": {
     "/api/stats/platform": {
       "get": {
-        "tags": ["stats"],
+        "tags": [
+          "stats"
+        ],
         "summary": "Public platform-wide stats",
         "description": "Latency, volume, user count. No auth required. Safe entry point for crawlers.",
         "security": [],
         "responses": {
           "200": {
             "description": "OK",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PlatformStats" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformStats"
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/stats/summary": {
       "get": {
-        "tags": ["stats"],
+        "tags": [
+          "stats"
+        ],
         "summary": "Current user's PnL summary",
-        "security": [{ "bearerJwt": [] }, { "apiKey": ["read:account"] }],
+        "security": [
+          {
+            "bearerJwt": []
+          },
+          {
+            "apiKey": [
+              "read:account"
+            ]
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UserSummary" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserSummary"
+                }
+              }
+            }
           },
-          "401": { "$ref": "#/components/responses/Unauthorized" }
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
         }
       }
     },
     "/api/stats/latency": {
       "get": {
-        "tags": ["stats"],
+        "tags": [
+          "stats"
+        ],
         "summary": "Per-user latency stats (last 7d)",
-        "security": [{ "bearerJwt": [] }, { "apiKey": ["read:account"] }],
+        "security": [
+          {
+            "bearerJwt": []
+          },
+          {
+            "apiKey": [
+              "read:account"
+            ]
+          }
+        ],
         "responses": {
-          "200": { "description": "OK" },
-          "401": { "$ref": "#/components/responses/Unauthorized" }
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
         }
       }
     },
     "/api/markets/translations": {
       "get": {
-        "tags": ["markets"],
+        "tags": [
+          "markets"
+        ],
         "summary": "Batch market translations",
         "description": "Returns translated market metadata for a list of slugs. No auth required.",
         "security": [],
         "parameters": [
-          { "name": "slugs", "in": "query", "schema": { "type": "string" }, "description": "Comma-separated market slugs" },
-          { "name": "locale", "in": "query", "schema": { "type": "string", "example": "fr" } }
+          {
+            "name": "slugs",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Comma-separated market slugs"
+          },
+          {
+            "name": "locale",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "example": "fr"
+            }
+          }
         ],
         "responses": {
           "200": {
@@ -384,7 +803,12 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "translations": { "type": "array", "items": { "$ref": "#/components/schemas/MarketTranslation" } }
+                    "translations": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MarketTranslation"
+                      }
+                    }
                   }
                 }
               }
@@ -395,87 +819,207 @@
     },
     "/api/markets/translations/search": {
       "get": {
-        "tags": ["markets"],
+        "tags": [
+          "markets"
+        ],
         "summary": "Search markets by title",
         "security": [],
         "parameters": [
-          { "name": "q", "in": "query", "required": true, "schema": { "type": "string" } },
-          { "name": "locale", "in": "query", "schema": { "type": "string" } },
-          { "$ref": "#/components/parameters/limit" }
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locale",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          }
         ],
-        "responses": { "200": { "description": "OK" } }
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
       }
     },
     "/api/markets/order": {
       "post": {
-        "tags": ["markets"],
+        "tags": [
+          "markets"
+        ],
         "summary": "Place market or limit order",
-        "security": [{ "bearerJwt": [] }, { "apiKey": ["trade:execute"] }],
-        "parameters": [{ "$ref": "#/components/parameters/idempotencyKey" }],
+        "security": [
+          {
+            "bearerJwt": []
+          },
+          {
+            "apiKey": [
+              "trade:execute"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/idempotencyKey"
+          }
+        ],
         "requestBody": {
           "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PlaceOrderRequest" } } }
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlaceOrderRequest"
+              }
+            }
+          }
         },
         "responses": {
           "200": {
             "description": "Order accepted or filled",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PlaceOrderResponse" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaceOrderResponse"
+                }
+              }
+            }
           },
-          "401": { "$ref": "#/components/responses/Unauthorized" },
-          "403": { "$ref": "#/components/responses/Forbidden" },
-          "429": { "$ref": "#/components/responses/RateLimited" }
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
         }
       }
     },
     "/api/markets/orders": {
       "get": {
-        "tags": ["markets"],
+        "tags": [
+          "markets"
+        ],
         "summary": "List open CLOB orders",
-        "security": [{ "bearerJwt": [] }, { "apiKey": ["read:markets"] }],
-        "responses": { "200": { "description": "OK" } }
+        "security": [
+          {
+            "bearerJwt": []
+          },
+          {
+            "apiKey": [
+              "read:markets"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
       },
       "delete": {
-        "tags": ["markets"],
+        "tags": [
+          "markets"
+        ],
         "summary": "Cancel all open orders",
-        "security": [{ "bearerJwt": [] }, { "apiKey": ["trade:cancel"] }],
-        "responses": { "200": { "description": "Cancelled" } }
+        "security": [
+          {
+            "bearerJwt": []
+          },
+          {
+            "apiKey": [
+              "trade:cancel"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cancelled"
+          }
+        }
       }
     },
     "/api/markets/orders/{order_id}": {
       "delete": {
-        "tags": ["markets"],
-        "summary": "Cancel a single order",
-        "security": [{ "bearerJwt": [] }, { "apiKey": ["trade:cancel"] }],
-        "parameters": [
-          { "name": "order_id", "in": "path", "required": true, "schema": { "type": "string" } }
+        "tags": [
+          "markets"
         ],
-        "responses": { "200": { "description": "Cancelled" } }
+        "summary": "Cancel a single order",
+        "security": [
+          {
+            "bearerJwt": []
+          },
+          {
+            "apiKey": [
+              "trade:cancel"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cancelled"
+          }
+        }
       }
     },
     "/api/positions": {
       "get": {
-        "tags": ["positions"],
+        "tags": [
+          "positions"
+        ],
         "summary": "List current user's open Polymarket positions",
-        "description": "Returns a bare JSON array of positions. Pagination metadata is conveyed in response headers (`X-Pagination-Limit`, `X-Pagination-Offset`, `X-Pagination-Has-Next`, `X-Pagination-Count`) — non-breaking with first-party clients that already deserialize the array directly.",
-        "security": [{ "bearerJwt": [] }, { "apiKey": ["read:positions"] }],
+        "description": "Returns a bare JSON array of positions, optionally filtered by `active_only` (defaults to true — only positions with shares > 0). The handler returns the full filtered set in a single response, so this endpoint does **not** paginate; do not send `limit`/`offset` and do not expect `X-Pagination-*` headers. Use `/api/trades` (which does paginate) when you need windowed results.",
+        "security": [
+          {
+            "bearerJwt": []
+          },
+          {
+            "apiKey": [
+              "read:positions"
+            ]
+          }
+        ],
         "parameters": [
-          { "$ref": "#/components/parameters/limit" },
-          { "$ref": "#/components/parameters/offset" }
+          {
+            "name": "active_only",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            },
+            "description": "Filter to positions with shares > 0. Set false to include closed positions."
+          }
         ],
         "responses": {
           "200": {
             "description": "OK",
-            "headers": {
-              "X-Pagination-Limit": { "schema": { "type": "integer" }, "description": "The `limit` applied to this query." },
-              "X-Pagination-Offset": { "schema": { "type": "integer" }, "description": "The `offset` applied to this query." },
-              "X-Pagination-Count": { "schema": { "type": "integer" }, "description": "Number of items in this response page." },
-              "X-Pagination-Has-Next": { "schema": { "type": "string", "enum": ["true", "false"] }, "description": "`true` if a follow-up page is likely (cheap heuristic — full page implies more)." }
-            },
             "content": {
               "application/json": {
                 "schema": {
                   "type": "array",
-                  "items": { "$ref": "#/components/schemas/Position" }
+                  "items": {
+                    "$ref": "#/components/schemas/Position"
+                  }
                 }
               }
             }
@@ -485,11 +1029,26 @@
     },
     "/api/positions/claim": {
       "post": {
-        "tags": ["positions"],
+        "tags": [
+          "positions"
+        ],
         "summary": "Redeem resolved positions",
         "description": "Submits on-chain redemption transactions for resolved positions. **Idempotent** via `Idempotency-Key` header.",
-        "security": [{ "bearerJwt": [] }, { "apiKey": ["wallet:write"] }],
-        "parameters": [{ "$ref": "#/components/parameters/idempotencyKey" }],
+        "security": [
+          {
+            "bearerJwt": []
+          },
+          {
+            "apiKey": [
+              "wallet:write"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/idempotencyKey"
+          }
+        ],
         "requestBody": {
           "required": false,
           "content": {
@@ -499,7 +1058,9 @@
                 "properties": {
                   "token_ids": {
                     "type": "array",
-                    "items": { "type": "string" },
+                    "items": {
+                      "type": "string"
+                    },
                     "description": "Optional: subset of token IDs to claim. If omitted, claims all claimable positions."
                   }
                 }
@@ -508,82 +1069,200 @@
           }
         },
         "responses": {
-          "200": { "description": "Claim transactions submitted" },
+          "200": {
+            "description": "Claim transactions submitted"
+          },
           "402": {
             "description": "Insufficient gas balance",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/positions/sell": {
       "post": {
-        "tags": ["positions"],
+        "tags": [
+          "positions"
+        ],
         "summary": "Sell open positions at market",
-        "security": [{ "bearerJwt": [] }, { "apiKey": ["wallet:write"] }],
-        "parameters": [{ "$ref": "#/components/parameters/idempotencyKey" }],
+        "description": "Places CLOB sell orders for the listed token IDs. This is order entry (it writes to the book), so it's gated on `trade:execute` — not `wallet:write` (which is reserved for on-chain redemption / withdraw).",
+        "security": [
+          {
+            "bearerJwt": []
+          },
+          {
+            "apiKey": [
+              "trade:execute"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/idempotencyKey"
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["token_ids"],
+                "required": [
+                  "token_ids"
+                ],
                 "properties": {
-                  "token_ids": { "type": "array", "items": { "type": "string" } }
+                  "token_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }
           }
         },
-        "responses": { "200": { "description": "Sell orders placed" } }
+        "responses": {
+          "200": {
+            "description": "Sell orders placed"
+          }
+        }
       }
     },
     "/api/paper/positions": {
       "get": {
-        "tags": ["paper"],
+        "tags": [
+          "paper"
+        ],
         "summary": "List paper-trading positions",
-        "security": [{ "bearerJwt": [] }, { "apiKey": ["read:positions"] }],
-        "responses": { "200": { "description": "OK" } }
+        "security": [
+          {
+            "bearerJwt": []
+          },
+          {
+            "apiKey": [
+              "read:positions"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
       }
     },
     "/api/paper/trades": {
       "get": {
-        "tags": ["paper"],
-        "summary": "List paper trades",
-        "security": [{ "bearerJwt": [] }, { "apiKey": ["read:trades"] }],
-        "parameters": [
-          { "$ref": "#/components/parameters/limit" },
-          { "$ref": "#/components/parameters/offset" }
+        "tags": [
+          "paper"
         ],
-        "responses": { "200": { "description": "OK" } }
+        "summary": "List paper trades",
+        "security": [
+          {
+            "bearerJwt": []
+          },
+          {
+            "apiKey": [
+              "read:trades"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "$ref": "#/components/parameters/offset"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
       }
     },
     "/api/trades": {
       "get": {
-        "tags": ["trades"],
+        "tags": [
+          "trades"
+        ],
         "summary": "Trade history",
         "description": "Bare JSON array of trades, newest first. Pagination conveyed in response headers (`X-Pagination-*`).",
-        "security": [{ "bearerJwt": [] }, { "apiKey": ["read:trades"] }],
+        "security": [
+          {
+            "bearerJwt": []
+          },
+          {
+            "apiKey": [
+              "read:trades"
+            ]
+          }
+        ],
         "parameters": [
-          { "$ref": "#/components/parameters/limit" },
-          { "$ref": "#/components/parameters/offset" },
-          { "name": "config_id", "in": "query", "schema": { "type": "string", "format": "uuid" }, "description": "Filter by copy-config ID" }
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "$ref": "#/components/parameters/offset"
+          },
+          {
+            "name": "config_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Filter by copy-config ID"
+          }
         ],
         "responses": {
           "200": {
             "description": "OK",
             "headers": {
-              "X-Pagination-Limit": { "schema": { "type": "integer" }, "description": "The `limit` applied to this query." },
-              "X-Pagination-Offset": { "schema": { "type": "integer" }, "description": "The `offset` applied to this query." },
-              "X-Pagination-Count": { "schema": { "type": "integer" }, "description": "Number of items in this response page." },
-              "X-Pagination-Has-Next": { "schema": { "type": "string", "enum": ["true", "false"] }, "description": "`true` if a follow-up page is likely (cheap heuristic — full page implies more)." }
+              "X-Pagination-Limit": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "The `limit` applied to this query."
+              },
+              "X-Pagination-Offset": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "The `offset` applied to this query."
+              },
+              "X-Pagination-Count": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Number of items in this response page."
+              },
+              "X-Pagination-Has-Next": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                },
+                "description": "`true` if a follow-up page is likely (cheap heuristic — full page implies more)."
+              }
             },
             "content": {
               "application/json": {
                 "schema": {
                   "type": "array",
-                  "items": { "$ref": "#/components/schemas/Trade" }
+                  "items": {
+                    "$ref": "#/components/schemas/Trade"
+                  }
                 }
               }
             }
@@ -593,162 +1272,513 @@
     },
     "/api/trades/{id}": {
       "get": {
-        "tags": ["trades"],
+        "tags": [
+          "trades"
+        ],
         "summary": "Single trade detail",
-        "security": [{ "bearerJwt": [] }, { "apiKey": ["read:trades"] }],
+        "security": [
+          {
+            "bearerJwt": []
+          },
+          {
+            "apiKey": [
+              "read:trades"
+            ]
+          }
+        ],
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
         ],
         "responses": {
           "200": {
             "description": "OK",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Trade" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Trade"
+                }
+              }
+            }
           },
-          "404": { "description": "Trade not found" }
+          "404": {
+            "description": "Trade not found"
+          }
         }
       }
     },
     "/api/configs": {
       "get": {
-        "tags": ["configs"],
+        "tags": [
+          "configs"
+        ],
         "summary": "List copy-trading configs",
-        "security": [{ "bearerJwt": [] }, { "apiKey": ["read:account"] }],
-        "responses": { "200": { "description": "OK" } }
+        "security": [
+          {
+            "bearerJwt": []
+          },
+          {
+            "apiKey": [
+              "read:account"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
       },
       "post": {
-        "tags": ["configs"],
+        "tags": [
+          "configs"
+        ],
         "summary": "Create copy-trading config",
-        "security": [{ "bearerJwt": [] }, { "apiKey": ["trade:execute"] }],
+        "security": [
+          {
+            "bearerJwt": []
+          },
+          {
+            "apiKey": [
+              "trade:execute"
+            ]
+          }
+        ],
         "requestBody": {
           "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CopyConfig" } } }
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CopyConfig"
+              }
+            }
+          }
         },
-        "responses": { "201": { "description": "Created" } }
+        "responses": {
+          "201": {
+            "description": "Created"
+          }
+        }
       }
     },
     "/api/configs/{id}": {
       "get": {
-        "tags": ["configs"],
+        "tags": [
+          "configs"
+        ],
         "summary": "Get config",
-        "security": [{ "bearerJwt": [] }, { "apiKey": ["read:account"] }],
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
-        "responses": { "200": { "description": "OK" } }
+        "security": [
+          {
+            "bearerJwt": []
+          },
+          {
+            "apiKey": [
+              "read:account"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
       },
       "put": {
-        "tags": ["configs"],
+        "tags": [
+          "configs"
+        ],
         "summary": "Update config",
-        "security": [{ "bearerJwt": [] }, { "apiKey": ["trade:execute"] }],
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
-        "responses": { "200": { "description": "OK" } }
+        "security": [
+          {
+            "bearerJwt": []
+          },
+          {
+            "apiKey": [
+              "trade:execute"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
       },
       "delete": {
-        "tags": ["configs"],
+        "tags": [
+          "configs"
+        ],
         "summary": "Delete config",
-        "security": [{ "bearerJwt": [] }, { "apiKey": ["trade:execute"] }],
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
-        "responses": { "204": { "description": "Deleted" } }
+        "security": [
+          {
+            "bearerJwt": []
+          },
+          {
+            "apiKey": [
+              "trade:execute"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted"
+          }
+        }
       }
     },
     "/api/configs/{id}/start": {
       "post": {
-        "tags": ["configs"],
+        "tags": [
+          "configs"
+        ],
         "summary": "Start copying",
-        "security": [{ "bearerJwt": [] }, { "apiKey": ["trade:execute"] }],
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
-        "responses": { "200": { "description": "OK" } }
+        "security": [
+          {
+            "bearerJwt": []
+          },
+          {
+            "apiKey": [
+              "trade:execute"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
       }
     },
     "/api/configs/{id}/stop": {
       "post": {
-        "tags": ["configs"],
+        "tags": [
+          "configs"
+        ],
         "summary": "Stop copying",
-        "security": [{ "bearerJwt": [] }, { "apiKey": ["trade:execute"] }],
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
-        "responses": { "200": { "description": "OK" } }
+        "security": [
+          {
+            "bearerJwt": []
+          },
+          {
+            "apiKey": [
+              "trade:execute"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
       }
     },
     "/api/configs/{id}/pnl": {
       "get": {
-        "tags": ["configs"],
+        "tags": [
+          "configs"
+        ],
         "summary": "Config-level PnL summary",
         "description": "Realized + unrealized PnL aggregated for one copy-trading config, with a per-position breakdown. Useful for agents deciding whether to keep, tune, or stop a config.",
-        "security": [{ "bearerJwt": [] }, { "apiKey": ["read:account"] }],
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
-        "responses": { "200": { "description": "OK" } }
+        "security": [
+          {
+            "bearerJwt": []
+          },
+          {
+            "apiKey": [
+              "read:account"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
       }
     },
     "/api/configs/{id}/trades": {
       "get": {
-        "tags": ["configs"],
-        "summary": "Trades attributed to this config",
-        "security": [{ "bearerJwt": [] }, { "apiKey": ["read:trades"] }],
-        "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
-          { "$ref": "#/components/parameters/limit" },
-          { "$ref": "#/components/parameters/offset" }
+        "tags": [
+          "configs"
         ],
-        "responses": { "200": { "description": "OK" } }
+        "summary": "Trades attributed to this config",
+        "security": [
+          {
+            "bearerJwt": []
+          },
+          {
+            "apiKey": [
+              "read:trades"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "$ref": "#/components/parameters/offset"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
       }
     },
     "/api/configs/{id}/status": {
       "get": {
-        "tags": ["configs"],
+        "tags": [
+          "configs"
+        ],
         "summary": "Live executor status for a copy config",
         "description": "Returns whether the per-config executor is running, last-error info, and recent fill counts. Use to surface stuck-config conditions to the user.",
-        "security": [{ "bearerJwt": [] }, { "apiKey": ["read:account"] }],
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
-        "responses": { "200": { "description": "OK" } }
+        "security": [
+          {
+            "bearerJwt": []
+          },
+          {
+            "apiKey": [
+              "read:account"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
       }
     },
     "/api/helpers/suggest-multiplier": {
       "get": {
-        "tags": ["configs"],
+        "tags": [
+          "configs"
+        ],
         "summary": "Suggest a sizing multiplier",
         "description": "Server-side helper that returns a recommended `size_multiplier` based on the user's current balance. Read-only; does not create a config.",
-        "security": [{ "bearerJwt": [] }, { "apiKey": ["read:markets"] }],
-        "parameters": [
-          { "name": "balance", "in": "query", "schema": { "type": "number" }, "description": "Optional balance override (USDC). Defaults to live tier-service balance." }
+        "security": [
+          {
+            "bearerJwt": []
+          },
+          {
+            "apiKey": [
+              "read:markets"
+            ]
+          }
         ],
-        "responses": { "200": { "description": "OK" } }
+        "parameters": [
+          {
+            "name": "balance",
+            "in": "query",
+            "schema": {
+              "type": "number"
+            },
+            "description": "Optional balance override (USDC). Defaults to live tier-service balance."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
       }
     },
     "/api/users/me": {
       "get": {
-        "tags": ["users"],
+        "tags": [
+          "users"
+        ],
         "summary": "Current user profile",
-        "security": [{ "bearerJwt": [] }, { "apiKey": ["read:account"] }],
-        "responses": { "200": { "description": "OK" } }
+        "security": [
+          {
+            "bearerJwt": []
+          },
+          {
+            "apiKey": [
+              "read:account"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
       }
     },
     "/api/wallets/balance": {
       "get": {
-        "tags": ["wallets"],
+        "tags": [
+          "wallets"
+        ],
         "summary": "Wallet balances (pUSD, USDC, MATIC)",
-        "security": [{ "bearerJwt": [] }, { "apiKey": ["read:account"] }],
-        "responses": { "200": { "description": "OK" } }
+        "security": [
+          {
+            "bearerJwt": []
+          },
+          {
+            "apiKey": [
+              "read:account"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
       }
     },
     "/api/wallets/deposit-address": {
       "get": {
-        "tags": ["wallets"],
+        "tags": [
+          "wallets"
+        ],
         "summary": "Deposit address for funding",
-        "security": [{ "bearerJwt": [] }, { "apiKey": ["read:account"] }],
-        "responses": { "200": { "description": "OK" } }
+        "security": [
+          {
+            "bearerJwt": []
+          },
+          {
+            "apiKey": [
+              "read:account"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
       }
     },
     "/api/trading-wallet/withdraw": {
       "post": {
-        "tags": ["wallets"],
+        "tags": [
+          "wallets"
+        ],
         "summary": "Withdraw funds from trading wallet",
-        "security": [{ "bearerJwt": [] }, { "apiKey": ["wallet:write"] }],
-        "parameters": [{ "$ref": "#/components/parameters/idempotencyKey" }],
+        "security": [
+          {
+            "bearerJwt": []
+          },
+          {
+            "apiKey": [
+              "wallet:write"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/idempotencyKey"
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["to_address", "amount", "token"],
+                "required": [
+                  "to_address",
+                  "amount",
+                  "token"
+                ],
                 "properties": {
                   "to_address": {
                     "type": "string",
@@ -761,7 +1791,11 @@
                   },
                   "token": {
                     "type": "string",
-                    "enum": ["usdc", "usdc_e", "matic"],
+                    "enum": [
+                      "usdc",
+                      "usdc_e",
+                      "matic"
+                    ],
                     "description": "Which on-chain asset to withdraw. `usdc` = pUSD."
                   }
                 }
@@ -777,9 +1811,16 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "success": { "type": "boolean" },
-                    "tx_hash": { "type": "string", "nullable": true },
-                    "message": { "type": "string" }
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "tx_hash": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "message": {
+                      "type": "string"
+                    }
                   }
                 }
               }
@@ -790,18 +1831,25 @@
     },
     "/api/keys": {
       "get": {
-        "tags": ["keys"],
+        "tags": [
+          "keys"
+        ],
         "summary": "List API keys for current user",
-        "security": [{ "bearerJwt": [] }],
+        "description": "Returns a bare JSON array of ApiKey objects. The plaintext secret is never included — only metadata + the safe-to-show `prefix`. Sorted newest-first.",
+        "security": [
+          {
+            "bearerJwt": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "keys": { "type": "array", "items": { "$ref": "#/components/schemas/ApiKey" } }
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ApiKey"
                   }
                 }
               }
@@ -810,55 +1858,125 @@
         }
       },
       "post": {
-        "tags": ["keys"],
+        "tags": [
+          "keys"
+        ],
         "summary": "Mint a new API key",
         "description": "Returns the full secret ONCE. Store it immediately — it cannot be retrieved later.",
-        "security": [{ "bearerJwt": [] }],
+        "security": [
+          {
+            "bearerJwt": []
+          }
+        ],
         "requestBody": {
           "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiKeyCreateRequest" } } }
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiKeyCreateRequest"
+              }
+            }
+          }
         },
         "responses": {
           "201": {
             "description": "Created",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiKeyCreateResponse" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiKeyCreateResponse"
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/keys/{id}": {
       "delete": {
-        "tags": ["keys"],
+        "tags": [
+          "keys"
+        ],
         "summary": "Revoke an API key",
-        "security": [{ "bearerJwt": [] }],
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
-        "responses": { "204": { "description": "Revoked" } }
+        "security": [
+          {
+            "bearerJwt": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Revoked"
+          }
+        }
       }
     },
     "/api/mcp": {
       "post": {
-        "tags": ["mcp"],
+        "tags": [
+          "mcp"
+        ],
         "summary": "Model Context Protocol JSON-RPC endpoint",
-        "description": "MCP server entry point. Speaks JSON-RPC 2.0 over the MCP Streamable HTTP transport. Authenticate with a `pzk_*` API key — JWTs are rejected here to keep agent automation off browser-session tokens.\n\n### Available tools (v1)\n\nThe server returns only the subset of tools your API key's scopes permit.\n\n**Discovery / unauthenticated-scope:**\n- `get_platform_stats` — public latency + volume metrics\n- `search_markets` — full-text Polymarket market search (read:markets)\n\n**Per-user reads:**\n- `get_user_summary` (read:account)\n- `list_open_positions` (read:positions)\n- `list_paper_positions` (read:positions)\n- `list_trades` (read:trades)\n\n**Copy-trading reads:**\n- `list_copy_configs` (read:account)\n- `get_copy_config` (read:account)\n- `get_config_pnl` (read:account)\n- `get_config_trades` (read:trades)\n- `suggest_multiplier` (read:markets)\n\n**Copy-trading writes:**\n- `create_copy_config` (trade:execute)\n- `start_copying` (trade:execute)\n- `stop_copying` (trade:execute)\n- `delete_copy_config` (trade:execute)\n\n**Direct trading:**\n- `place_market_order` (trade:execute)\n- `list_open_orders` (read:markets)\n- `cancel_order` (trade:cancel)\n- `claim_positions` (wallet:write)\n\nFull MCP manifest at `https://polyzig.com/.well-known/mcp.json`.",
-        "security": [{ "apiKey": [] }],
+        "description": "MCP server entry point. Speaks JSON-RPC 2.0 over the MCP Streamable HTTP transport. Hosted clients such as Poke should authenticate with a PolyZig OAuth `pzo_*` access token. Developer clients can authenticate with a scoped `pzk_*` API key. Browser JWTs are rejected here to keep agent automation off full-session tokens.\n\n### Available tools (v1)\n\nThe server returns only the subset of tools your credential scopes permit.\n\n**Discovery / setup:**\n- `get_platform_stats` — public latency + volume metrics\n- `get_trading_readiness` (read:account) — scopes, balance, trading wallet status, blockers\n- `search_markets` (read:markets) — iMessage-ready market cards with outcomes, token IDs, prices, links, and optional locale\n- `get_market_details` (read:markets) — localized context, Gamma status, condition IDs, outcome token IDs, live prices, volume, liquidity, and bounded snapshots\n- `get_market_depth` (read:markets) — CLOB best bid/ask, spread, top levels, cumulative depth, and depth within 1c/2c/5c\n- `get_market_price_history` (read:markets) — sampled CLOB history with open/latest/high/low/change\n- `list_top_traders` (read:markets) — copyable leaderboard trader cards\n\n**Per-user reads:**\n- `get_user_summary` (read:account)\n- `list_open_positions` (read:positions)\n- `list_paper_positions` (read:positions)\n- `list_trades` (read:trades)\n\n**Copy-trading reads/previews:**\n- `list_copy_configs` (read:account)\n- `get_copy_config` (read:account)\n- `get_config_pnl` (read:account)\n- `get_config_trades` (read:trades)\n- `suggest_multiplier` (read:markets)\n- `preview_copy_config` (trade:execute)\n\n**Copy-trading writes:**\n- `create_copy_config` (trade:execute) — requires `preview_id` and `idempotency_key`\n- `start_copying` (trade:execute) — requires `idempotency_key`\n- `stop_copying` (trade:execute) — requires `idempotency_key`\n- `delete_copy_config` (trade:execute) — requires `idempotency_key`\n\n**Direct trading:**\n- `preview_market_order` (trade:execute)\n- `place_market_order` (trade:execute) — requires `preview_id` and `idempotency_key`\n- `list_open_orders` (read:markets)\n- `cancel_order` (trade:cancel) — requires `idempotency_key`\n- `claim_positions` (wallet:write) — requires `idempotency_key`\n\nFull MCP manifest at `https://polyzig.com/.well-known/mcp.json`.",
+        "security": [
+          {
+            "apiKey": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["jsonrpc", "method"],
+                "required": [
+                  "jsonrpc",
+                  "method"
+                ],
                 "properties": {
-                  "jsonrpc": { "type": "string", "const": "2.0" },
-                  "id": { "oneOf": [{ "type": "string" }, { "type": "integer" }, { "type": "null" }] },
-                  "method": { "type": "string" },
-                  "params": { "type": "object" }
+                  "jsonrpc": {
+                    "type": "string",
+                    "const": "2.0"
+                  },
+                  "id": {
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "method": {
+                    "type": "string"
+                  },
+                  "params": {
+                    "type": "object"
+                  }
                 }
               }
             }
           }
         },
-        "responses": { "200": { "description": "JSON-RPC response" } }
+        "responses": {
+          "200": {
+            "description": "JSON-RPC response"
+          }
+        }
       }
     }
   }
