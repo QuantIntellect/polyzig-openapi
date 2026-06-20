@@ -232,6 +232,7 @@ The MCP server returns only the tools your credential's scopes permit. **Every t
 
 **Discovery (requires `read:markets`):**
 
+- `quote` — one-shot odds lookup: a natural-language question (e.g. "odds the Chiefs win tonight", "will the Fed cut rates in July") resolves to the single best LIVE market and returns its current YES/NO odds, outcome token IDs, and a buy-preview action — no separate search step. Use `search_markets` when the user wants to browse several markets.
 - `search_markets` — active market cards with emoji/category badges, images/logos, outcome choices, token IDs, prices, links, and iMessage action hints
 - `get_market_details` — localized context, Gamma status, condition ID, outcome token IDs, prices, volume/liquidity, bounded live snapshots, choices, and next-step actions
 - `get_market_depth` — CLOB best bid/ask, spread, top levels, cumulative liquidity, depth within 1c/2c/5c, and depth-card actions
@@ -245,6 +246,8 @@ The MCP server returns only the tools your credential's scopes permit. **Every t
 - `list_open_positions` — `read:positions` — current holdings + unrealized PnL
 - `list_paper_positions` — `read:positions` — paper-trading positions
 - `list_trades` — `read:trades` — fill history with latency
+- `get_spend_caps` — `read:account` — the user's per-order and rolling-24h USDC spend caps for assistant-placed orders, plus how much of the daily cap is used and left (NULL = unlimited)
+- `set_spend_caps` — `trade:execute` — set or remove the per-order / daily USDC caps; pass `0` to remove a cap, omit a field to leave it unchanged. `preview_market_order` and `place_market_order` reject any order that would breach a configured cap.
 
 ### Poke / iMessage presentation
 

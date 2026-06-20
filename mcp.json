@@ -2,8 +2,8 @@
   "$schema": "https://modelcontextprotocol.io/schema/v1/manifest.json",
   "name": "polyzig-platform",
   "displayName": "PolyZig — Polymarket Trader",
-  "description": "Polymarket market intelligence and sub-500ms copy-trading. Poke users connect with PolyZig OAuth, inspect localized markets, images/logos, depth, history, liquidity, outcome choices, and iMessage-ready actions, then trade or manage copy configurations from Messages with preview-confirmed live writes.",
-  "version": "1.0.0",
+  "description": "Polymarket market intelligence and sub-500ms copy-trading. Poke users connect with PolyZig OAuth, ask a natural-language question to get live odds in one shot (quote), inspect localized markets, images/logos, depth, history, liquidity, and outcome choices, then trade or manage copy configurations from Messages with preview-confirmed live writes under user-set spend caps.",
+  "version": "1.1.0",
   "protocolVersion": "2025-06-18",
   "endpoint": {
     "url": "https://api.polyzig.com/api/mcp",
